@@ -1,0 +1,36 @@
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Hosting / MCP -->
+    <PackageVersion Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.8" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Json" Version="10.0.8" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.8" />
+    <PackageVersion Include="ModelContextProtocol.AspNetCore" Version="1.3.0" />
+
+    <!-- Outlook provider: Microsoft Graph + MSAL (both MIT) -->
+    <PackageVersion Include="Microsoft.Graph" Version="5.105.0" />
+    <PackageVersion Include="Microsoft.Identity.Client" Version="4.80.0" />
+    <!-- Override Graph's transitive Microsoft.Kiota.Abstractions 1.21.1 (advisory GHSA-7j59-v9qr-6fq9, NU1903). MIT. -->
+    <PackageVersion Include="Microsoft.Kiota.Abstractions" Version="1.22.2" />
+
+    <!-- Gmail/Google provider: Google API client libraries (Apache-2.0). Matched 1.74.0 set. -->
+    <PackageVersion Include="Google.Apis.Gmail.v1" Version="1.74.0.4162" />
+    <PackageVersion Include="Google.Apis.Calendar.v3" Version="1.74.0.4154" />
+    <PackageVersion Include="Google.Apis.Auth" Version="1.74.0" />
+
+    <!-- RFC822 build/parse for Gmail send/draft (MIT) -->
+    <PackageVersion Include="MimeKit" Version="4.17.0" />
+
+    <!-- Logging (Apache-2.0) -->
+    <PackageVersion Include="Serilog.AspNetCore" Version="10.0.0" />
+    <PackageVersion Include="Serilog.Enrichers.Environment" Version="3.0.1" />
+    <PackageVersion Include="Serilog.Enrichers.Process" Version="3.0.0" />
+    <PackageVersion Include="Serilog.Enrichers.Thread" Version="4.0.0" />
+    <PackageVersion Include="Serilog.Settings.Configuration" Version="10.0.0" />
+    <PackageVersion Include="Serilog.Sinks.Console" Version="6.1.1" />
+    <PackageVersion Include="Serilog.Sinks.File" Version="7.0.0" />
+  </ItemGroup>
+</Project>

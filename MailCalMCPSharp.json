@@ -1,0 +1,56 @@
+{
+  "MailCal": {
+    "ReadOnly": true,
+    "AllowPermanentDelete": false,
+    "DefaultAccount": "",
+    "DefaultPageSize": 25,
+    "MaxPages": 4,
+    "MaxBodyChars": 20000,
+    "RequestTimeoutSeconds": 100,
+
+    "TokenStoreDirectory": "tokens",
+    "TokenEncryptionKey": "",
+
+    "EnableMail": true,
+    "EnableCalendar": true,
+    "EnableContacts": false,
+    "EnableRules": false,
+    "EnableScheduledSend": false,
+
+    "Accounts": [
+      {
+        "Alias": "work",
+        "Provider": "Outlook",
+        "AuthType": "Delegated",
+        "TenantId": "common",
+        "ClientId": "",
+        "ClientSecret": "",
+        "UserPrincipalName": "",
+        "Description": "Example Outlook account — fill in ClientId then run --auth work"
+      },
+      {
+        "Alias": "personal",
+        "Provider": "Gmail",
+        "AuthType": "Delegated",
+        "ClientId": "",
+        "ClientSecret": "",
+        "Description": "Example Gmail account — fill in ClientId/ClientSecret then run --auth personal"
+      }
+    ]
+  },
+  "Server": {
+    "Host": "localhost",
+    "Port": 5708,
+    "Path": "/mcp",
+    "WindowsServiceName": "MailCalMCPSharp",
+    "Password": ""
+  },
+  "Serilog": {
+    "MinimumLevel": {
+      "Default": "Information",
+      "Override": {
+        "Microsoft.AspNetCore": "Warning"
+      }
+    }
+  }
+}

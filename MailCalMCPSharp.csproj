@@ -1,0 +1,56 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>MailCalMCPSharp</RootNamespace>
+    <AssemblyName>MailCalMCPSharp</AssemblyName>
+    <ApplicationIcon>wmcp.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" />
+    <PackageReference Include="ModelContextProtocol.AspNetCore" />
+
+    <!-- Outlook provider (Microsoft Graph + MSAL) -->
+    <PackageReference Include="Microsoft.Graph" />
+    <PackageReference Include="Microsoft.Identity.Client" />
+    <!-- Pinned above Graph's transitive to clear security advisory GHSA-7j59-v9qr-6fq9. -->
+    <PackageReference Include="Microsoft.Kiota.Abstractions" />
+
+    <!-- Gmail/Google provider -->
+    <PackageReference Include="Google.Apis.Gmail.v1" />
+    <PackageReference Include="Google.Apis.Calendar.v3" />
+    <PackageReference Include="Google.Apis.Auth" />
+    <PackageReference Include="MimeKit" />
+
+    <PackageReference Include="Serilog.AspNetCore" />
+    <PackageReference Include="Serilog.Settings.Configuration" />
+    <PackageReference Include="Serilog.Sinks.Console" />
+    <PackageReference Include="Serilog.Sinks.File" />
+    <PackageReference Include="Serilog.Enrichers.Environment" />
+    <PackageReference Include="Serilog.Enrichers.Process" />
+    <PackageReference Include="Serilog.Enrichers.Thread" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="wmcp.ico" LogicalName="MCPSharp.wmcp.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="MailCalMCPSharp.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="MailCalMCPSharp.*.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <DependentUpon>MailCalMCPSharp.json</DependentUpon>
+    </None>
+  </ItemGroup>
+
+</Project>
