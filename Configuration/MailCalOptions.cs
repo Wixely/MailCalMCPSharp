@@ -78,6 +78,9 @@ public enum MailCalProvider
 {
     Outlook,
     Gmail,
+
+    /// <summary>Generic IMAP (read) + SMTP (send) mailbox with username/password auth. Email only.</summary>
+    Imap,
 }
 
 /// <summary>How an account authenticates. v1 uses delegated OAuth; the rest are reserved for v2+.</summary>
@@ -120,8 +123,39 @@ public sealed class AccountEntry
     /// <summary>Optional target mailbox UPN — used for app-only mailbox selection (v2). Ignored for delegated auth.</summary>
     public string? UserPrincipalName { get; set; }
 
+    /// <summary>IMAP/SMTP connection settings. Required when <see cref="Provider"/> is <see cref="MailCalProvider.Imap"/>; ignored otherwise.</summary>
+    public ImapSettings Imap { get; set; } = new();
+
     /// <summary>Free-text description surfaced by <c>mailcal_list_accounts</c>. Optional.</summary>
     public string Description { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Connection settings for a generic IMAP (read) + SMTP (send) mailbox. Authentication is
+/// username + password (use an app password where the provider requires one). TLS is negotiated
+/// automatically from the port unless <see cref="Security"/> is set explicitly.
+/// </summary>
+public sealed class ImapSettings
+{
+    public string ImapHost { get; set; } = string.Empty;
+    public int ImapPort { get; set; } = 993;
+    public string SmtpHost { get; set; } = string.Empty;
+    public int SmtpPort { get; set; } = 587;
+
+    /// <summary>Login username (usually the full email address).</summary>
+    public string Username { get; set; } = string.Empty;
+
+    /// <summary>Login password / app password. Supports a <c>file:</c> prefix to read from a file. Never logged.</summary>
+    public string Password { get; set; } = string.Empty;
+
+    /// <summary>From address for sent mail. Defaults to <see cref="Username"/> when blank.</summary>
+    public string? FromAddress { get; set; }
+
+    /// <summary>Optional display name for sent mail.</summary>
+    public string? DisplayName { get; set; }
+
+    /// <summary>TLS mode: <c>auto</c> (default, inferred from port), <c>ssl</c> (implicit), <c>starttls</c>, or <c>none</c>.</summary>
+    public string Security { get; set; } = "auto";
 }
 
 public sealed class ServerOptions

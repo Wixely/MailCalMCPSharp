@@ -1,12 +1,13 @@
 # MailCalMCPSharp
 
 An MCP server for **email and calendar** across multiple providers — **Microsoft Outlook**
-(via Microsoft Graph) and **Google Gmail / Calendar** (via the Google API client libraries) —
-part of the MCPSharp product line.
+(via Microsoft Graph), **Google Gmail / Calendar** (via the Google API client libraries), and
+any **generic IMAP/SMTP mailbox** (via MailKit) — part of the MCPSharp product line.
 
 One provider-agnostic tool surface is routed to a configured account by its alias, so the
-same `mail_*` / `cal_*` tools work against Outlook or Gmail. Adding a provider in future adds
-no new tools.
+same `mail_*` / `cal_*` tools work against Outlook, Gmail, or an IMAP server. Adding a provider
+adds no new tools; each account advertises its capabilities, and tools return a clear
+"not supported by \<provider\>" when a feature is absent (e.g. calendar/contacts on IMAP).
 
 > **Status: full featureset implemented.** Email, calendar, contacts, inbox rules, and
 > scheduled send are implemented end-to-end for both Outlook (Microsoft Graph) and Gmail
@@ -28,12 +29,23 @@ no new tools.
 - **Accounts & auth:** list accounts, inspect auth state, authorize (browser or device-code),
   and sign out — all as tools the agent can call.
 
-## Authentication
+## Providers & authentication
 
-Delegated OAuth 2.0. Each account is authorized once; the server then runs unattended,
-refreshing silently. Auth is **agent-driven** — the agent calls `mailcal_authorize` and the
-server opens a browser on this machine (or returns a device code to relay). A one-time
+| Provider | Domains | Auth |
+| --- | --- | --- |
+| `Outlook` | email, calendar, contacts, rules, scheduled send | Delegated OAuth (agent-driven) |
+| `Gmail` | email, calendar, contacts, rules | Delegated OAuth (agent-driven) |
+| `Imap` | **email only** | Username / password (no OAuth) |
+
+**OAuth providers (Outlook/Gmail):** each account is authorized once; the server then runs
+unattended, refreshing silently. Auth is **agent-driven** — the agent calls `mailcal_authorize`
+and the server opens a browser on this machine (or returns a device code to relay). A one-time
 `--auth` CLI mode is provided for the pure Windows-Service case.
+
+**IMAP/SMTP provider:** uses configured `Username`/`Password` (use an app password where the
+provider requires one) — there is no OAuth step, so `mailcal_authorize` simply reports that the
+account is configured. IMAP accounts are email-only; calendar, contacts, rules, and scheduled
+send report as not supported.
 
 Tokens are stored in a **portable folder next to the executable** (`MailCal:TokenStoreDirectory`,
 default `tokens/`, resolved relative to the executable directory — the same location for a
@@ -96,9 +108,26 @@ be overridden by environment variables prefixed `MAILCALMCP_` using `__` for nes
 | `Server:Password` | Optional MCP endpoint password. | `""` |
 | `Server:WindowsServiceName` | SCM service name. | `MailCalMCPSharp` |
 
-Each entry under `MailCal:Accounts` has an `Alias`, a `Provider` (`Outlook` or `Gmail`),
-an `AuthType` (`Delegated`), and OAuth client credentials (`ClientId`, `ClientSecret`,
-`TenantId` for Outlook). OAuth tokens are **not** stored here — they live in the token folder.
+Each entry under `MailCal:Accounts` has an `Alias` and a `Provider` (`Outlook`, `Gmail`, or
+`Imap`):
+
+- **Outlook / Gmail** — set `AuthType` (`Delegated`) and OAuth client credentials (`ClientId`,
+  plus `ClientSecret` for Gmail, `TenantId` for Outlook). OAuth tokens are **not** stored here —
+  they live in the token folder.
+- **Imap** — set the nested `Imap` block: `ImapHost`/`ImapPort`, `SmtpHost`/`SmtpPort`,
+  `Username`, `Password` (supports `file:`), optional `FromAddress`/`DisplayName`, and
+  `Security` (`auto` | `ssl` | `starttls` | `none`, default `auto`).
+
+```jsonc
+{
+  "Alias": "imap", "Provider": "Imap",
+  "Imap": {
+    "ImapHost": "imap.example.com", "ImapPort": 993,
+    "SmtpHost": "smtp.example.com", "SmtpPort": 587,
+    "Username": "me@example.com", "Password": "file:secrets/imap.pass"
+  }
+}
+```
 
 ```
 MAILCALMCP_MailCal__ReadOnly=false

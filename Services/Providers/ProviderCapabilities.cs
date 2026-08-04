@@ -7,6 +7,9 @@ namespace MailCalMCPSharp.Services.Providers;
 /// </summary>
 public sealed record ProviderCapabilities
 {
+    /// <summary>Calendar support at all (Outlook/Gmail yes; IMAP/SMTP no).</summary>
+    public bool Calendar { get; init; } = true;
+
     /// <summary>Server-side message search (Graph $search / Gmail q).</summary>
     public bool MailSearch { get; init; } = true;
 

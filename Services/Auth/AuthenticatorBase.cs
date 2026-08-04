@@ -38,7 +38,7 @@ public abstract class AuthenticatorBase : IAuthenticator
         if (missing is not null)
         {
             state = AuthState.NotConfigured;
-            next = missing + $" Set MailCal:Accounts (alias '{Entry.Alias}') ClientId/secret to configure this account.";
+            next = missing + $" Configure account '{Entry.Alias}' under MailCal:Accounts.";
         }
         else if (HasStoredToken())
         {

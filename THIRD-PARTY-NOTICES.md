@@ -14,6 +14,7 @@ this file is provided for attribution. All dependencies are MIT or Apache-2.0.
 | Microsoft.Graph | MIT |
 | Microsoft.Identity.Client (MSAL.NET) | MIT |
 | MimeKit | MIT |
+| MailKit | MIT |
 | Google.Apis.Gmail.v1 | Apache-2.0 |
 | Google.Apis.Calendar.v3 | Apache-2.0 |
 | Google.Apis.PeopleService.v1 | Apache-2.0 |

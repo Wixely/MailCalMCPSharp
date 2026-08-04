@@ -30,6 +30,7 @@
     <PackageReference Include="Google.Apis.PeopleService.v1" />
     <PackageReference Include="Google.Apis.Auth" />
     <PackageReference Include="MimeKit" />
+    <PackageReference Include="MailKit" />
 
     <PackageReference Include="Serilog.AspNetCore" />
     <PackageReference Include="Serilog.Settings.Configuration" />

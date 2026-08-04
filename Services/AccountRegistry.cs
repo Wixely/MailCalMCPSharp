@@ -3,6 +3,7 @@ using MailCalMCPSharp.Services.Auth;
 using MailCalMCPSharp.Services.Models;
 using MailCalMCPSharp.Services.Providers;
 using MailCalMCPSharp.Services.Providers.Gmail;
+using MailCalMCPSharp.Services.Providers.Imap;
 using MailCalMCPSharp.Services.Providers.Outlook;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
@@ -66,6 +67,10 @@ public sealed class AccountRegistry
                     var gmailAuth = new GmailAuthenticator(entry, _tokenDirectory, encryptionKey, _options);
                     authenticator = gmailAuth;
                     account = new GmailAccount(entry, gmailAuth, _options);
+                    break;
+                case MailCalProvider.Imap:
+                    authenticator = new ImapAuthenticator(entry, _options);
+                    account = new ImapAccount(entry, _options);
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(entry.Provider), entry.Provider, "Unknown provider.");

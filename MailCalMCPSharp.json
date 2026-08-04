@@ -35,6 +35,22 @@
         "ClientId": "",
         "ClientSecret": "",
         "Description": "Example Gmail account — fill in ClientId/ClientSecret then run --auth personal"
+      },
+      {
+        "Alias": "imap",
+        "Provider": "Imap",
+        "Description": "Example generic IMAP/SMTP mailbox (email only). No OAuth — fill in host/username/password.",
+        "Imap": {
+          "ImapHost": "",
+          "ImapPort": 993,
+          "SmtpHost": "",
+          "SmtpPort": 587,
+          "Username": "",
+          "Password": "",
+          "FromAddress": "",
+          "DisplayName": "",
+          "Security": "auto"
+        }
       }
     ]
   },

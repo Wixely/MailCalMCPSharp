@@ -23,6 +23,7 @@ public sealed class CalendarTools
     {
         svc.EnsureCalendarEnabled();
         var acct = svc.Resolve(account);
+        AccountRegistry.EnsureCapability(acct, acct.Capabilities.Calendar, "calendar");
         var calendars = await acct.Calendar.ListCalendarsAsync(ct);
         return JsonSerializer.Serialize(calendars, JsonOpts.Default);
     }
@@ -40,6 +41,7 @@ public sealed class CalendarTools
     {
         svc.EnsureCalendarEnabled();
         var acct = svc.Resolve(account);
+        AccountRegistry.EnsureCapability(acct, acct.Capabilities.Calendar, "calendar");
         var from = ToolInput.Date(start, nameof(start));
         var to = ToolInput.Date(end, nameof(end));
         var page = await acct.Calendar.ReadAsync(calendarId, from, to, pageToken, svc.Options.DefaultPageSize, ct);
@@ -57,6 +59,7 @@ public sealed class CalendarTools
     {
         svc.EnsureCalendarEnabled();
         var acct = svc.Resolve(account);
+        AccountRegistry.EnsureCapability(acct, acct.Capabilities.Calendar, "calendar");
         var ev = await acct.Calendar.GetEventAsync(calendarId, eventId, ct);
         return JsonSerializer.Serialize(ev, JsonOpts.Default);
     }
@@ -74,6 +77,7 @@ public sealed class CalendarTools
     {
         svc.EnsureCalendarEnabled();
         var acct = svc.Resolve(account);
+        AccountRegistry.EnsureCapability(acct, acct.Capabilities.Calendar, "calendar");
         AccountRegistry.EnsureCapability(acct, acct.Capabilities.CalendarTextSearch, "calendar text search");
         var from = ToolInput.OptionalDate(start, nameof(start));
         var to = ToolInput.OptionalDate(end, nameof(end));
@@ -101,6 +105,7 @@ public sealed class CalendarTools
         svc.EnsureCalendarEnabled();
         svc.EnsureWriteAllowed("cal_create_event");
         var acct = svc.Resolve(account);
+        AccountRegistry.EnsureCapability(acct, acct.Capabilities.Calendar, "calendar");
         var input = new EventInput
         {
             Subject = subject,
@@ -136,6 +141,7 @@ public sealed class CalendarTools
         svc.EnsureCalendarEnabled();
         svc.EnsureWriteAllowed("cal_update_event");
         var acct = svc.Resolve(account);
+        AccountRegistry.EnsureCapability(acct, acct.Capabilities.Calendar, "calendar");
         var input = new EventInput
         {
             Subject = subject,
@@ -162,6 +168,7 @@ public sealed class CalendarTools
         svc.EnsureCalendarEnabled();
         svc.EnsureWriteAllowed("cal_delete_event");
         var acct = svc.Resolve(account);
+        AccountRegistry.EnsureCapability(acct, acct.Capabilities.Calendar, "calendar");
         await acct.Calendar.DeleteEventAsync(calendarId, eventId, ct);
         return JsonSerializer.Serialize(new { eventId, deleted = true }, JsonOpts.Default);
     }
@@ -184,6 +191,7 @@ public sealed class CalendarTools
             throw new ArgumentException("response must be one of: accept, decline, tentative.", nameof(response));
         }
         var acct = svc.Resolve(account);
+        AccountRegistry.EnsureCapability(acct, acct.Capabilities.Calendar, "calendar");
         await acct.Calendar.RespondEventAsync(calendarId, eventId, parsed, comment, ct);
         return JsonSerializer.Serialize(new { eventId, response = parsed.ToString() }, JsonOpts.Default);
     }

@@ -24,6 +24,8 @@
 
     <!-- RFC822 build/parse for Gmail send/draft (MIT) -->
     <PackageVersion Include="MimeKit" Version="4.17.0" />
+    <!-- Generic IMAP/SMTP provider (MIT) -->
+    <PackageVersion Include="MailKit" Version="4.17.0" />
 
     <!-- Logging (Apache-2.0) -->
     <PackageVersion Include="Serilog.AspNetCore" Version="10.0.0" />
