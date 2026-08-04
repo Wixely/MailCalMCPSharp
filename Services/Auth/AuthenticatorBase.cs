@@ -4,26 +4,26 @@ using MailCalMCPSharp.Services.Models;
 namespace MailCalMCPSharp.Services.Auth;
 
 /// <summary>
-/// Shared authenticator behaviour: config validation, stored-token detection, and sign-out.
-/// Providers supply the OAuth-specific bits (scopes, interactive/device-code acquisition, silent
-/// refresh). The observable-state and sign-out paths work in the v1 skeleton; the acquisition
-/// paths are implemented per provider in the v1 build.
+/// Shared authenticator behaviour: config validation and observable auth state. Providers supply
+/// the OAuth-specific bits (scopes, stored-token detection, interactive/device-code acquisition,
+/// silent refresh, sign-out).
 /// </summary>
 public abstract class AuthenticatorBase : IAuthenticator
 {
-    protected AuthenticatorBase(AccountEntry entry, ITokenStore store, MailCalOptions options)
+    protected AuthenticatorBase(AccountEntry entry, MailCalOptions options)
     {
         Entry = entry;
-        Store = store;
         Options = options;
     }
 
     protected AccountEntry Entry { get; }
-    protected ITokenStore Store { get; }
     protected MailCalOptions Options { get; }
 
     /// <summary>OAuth scopes requested for this provider.</summary>
     protected abstract IReadOnlyList<string> Scopes { get; }
+
+    /// <summary>True if a usable token appears to be stored for this account.</summary>
+    protected abstract bool HasStoredToken();
 
     /// <summary>Provider-specific reason the account is <see cref="AuthState.NotConfigured"/>, or null if configured.</summary>
     protected virtual string? MissingConfigReason() =>
@@ -38,12 +38,12 @@ public abstract class AuthenticatorBase : IAuthenticator
         if (missing is not null)
         {
             state = AuthState.NotConfigured;
-            next = missing + $" Set MailCal:Accounts:<{Entry.Alias}>:ClientId (and provider secret) to configure this account.";
+            next = missing + $" Set MailCal:Accounts (alias '{Entry.Alias}') ClientId/secret to configure this account.";
         }
-        else if (Store.Exists(Entry.Alias))
+        else if (HasStoredToken())
         {
-            // Skeleton: presence of a stored token implies authorized. The v1 build validates and
-            // downgrades to Error on a failed refresh.
+            // Optimistic: a stored token implies authorized. Operations surface real refresh
+            // failures; auth_status stays fast and does not hit the network on every call.
             state = AuthState.Authorized;
         }
         else
@@ -64,13 +64,17 @@ public abstract class AuthenticatorBase : IAuthenticator
 
     public abstract Task<AuthorizeResult> AuthorizeInteractiveAsync(CancellationToken ct);
 
-    public abstract Task<AuthorizeResult> AuthorizeDeviceCodeAsync(CancellationToken ct);
+    public abstract Task<AuthorizeResult> AuthorizeDeviceCodeAsync(bool waitForCompletion, CancellationToken ct);
 
-    public virtual Task<bool> SignOutAsync(CancellationToken ct) => Task.FromResult(Store.Delete(Entry.Alias));
+    public abstract Task<bool> SignOutAsync(CancellationToken ct);
 
     public abstract Task<string> AcquireAccessTokenAsync(CancellationToken ct);
 
-    /// <summary>Helper for stubbed provider acquisition paths.</summary>
-    protected AuthorizeResult NotImplementedAuthorize(string mode) => throw new NotImplementedException(
-        $"{Entry.Provider} {mode} authorization is not implemented in the v1 skeleton yet.");
+    protected AuthorizeResult Authorized(string? message) => new()
+    {
+        Account = Entry.Alias,
+        State = AuthState.Authorized,
+        Completed = true,
+        Message = message,
+    };
 }

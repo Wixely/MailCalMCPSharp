@@ -65,7 +65,15 @@ public static class Program
             builder.Host.UseSerilog((ctx, services, cfg) => cfg
                 .ReadFrom.Configuration(ctx.Configuration)
                 .ReadFrom.Services(services)
-                .Enrich.FromLogContext());
+                .Enrich.FromLogContext()
+                // Sinks in code so logs always go to the console and an exe-adjacent file,
+                // regardless of JSON (a Windows Service must not write to its System32 CWD).
+                .WriteTo.Console()
+                .WriteTo.File(
+                    Path.Combine(contentRoot, "logs", "mailcalmcp-.log"),
+                    rollingInterval: RollingInterval.Day,
+                    retainedFileCountLimit: 7,
+                    shared: true));
 
             builder.Services.Configure<MailCalOptions>(builder.Configuration.GetSection(MailCalOptions.SectionName));
             builder.Services.Configure<ServerOptions>(builder.Configuration.GetSection(ServerOptions.SectionName));
@@ -120,6 +128,7 @@ public static class Program
                     $"Read-only: {registry.IsReadOnly}",
                     $"Allow permanent delete: {registry.AllowPermanentDelete}",
                     $"Mail: {(mailCal.EnableMail ? "enabled" : "disabled")}, Calendar: {(mailCal.EnableCalendar ? "enabled" : "disabled")}",
+                    $"Token store: {registry.TokenDirectory}",
                     $"Accounts ({registry.Aliases.Count}): {(accountDetails.Length == 0 ? "none configured" : string.Join(", ", accountDetails))}",
                 });
 
@@ -174,8 +183,9 @@ public static class Program
             var authenticator = registry.Authenticator(alias);
             Console.WriteLine($"MailCalMCPSharp auth: account='{alias ?? registry.DefaultAlias}', mode='{mode}'.");
 
+            // CLI path: block until the user completes sign-in.
             var result = string.Equals(mode, "devicecode", StringComparison.OrdinalIgnoreCase)
-                ? authenticator.AuthorizeDeviceCodeAsync(CancellationToken.None).GetAwaiter().GetResult()
+                ? authenticator.AuthorizeDeviceCodeAsync(waitForCompletion: true, CancellationToken.None).GetAwaiter().GetResult()
                 : authenticator.AuthorizeInteractiveAsync(CancellationToken.None).GetAwaiter().GetResult();
 
             Console.WriteLine($"State: {result.State}. {result.Message}");

@@ -8,11 +8,11 @@ One provider-agnostic tool surface is routed to a configured account by its alia
 same `mail_*` / `cal_*` tools work against Outlook or Gmail. Adding a provider in future adds
 no new tools.
 
-> **Status: v1 skeleton.** Hosting, configuration, safety gates, the account registry, the
-> agent-driven auth lifecycle, and the full tool surface are wired up. The Outlook (Graph)
-> and Gmail (Google) provider data calls and the OAuth token acquisition are stubbed and
-> return a clear "not implemented in the v1 skeleton yet" message — they are the next build
-> step. Contacts, email rules, and scheduled-send are planned for v2.
+> **Status: v1 implemented.** Mail and calendar are implemented end-to-end for both Outlook
+> (Microsoft Graph) and Gmail (Google APIs), together with the agent-driven OAuth lifecycle
+> (interactive browser, device-code, and silent refresh). Contacts, email rules, and
+> scheduled-send are planned for v2. This has been built and compiles clean; the provider
+> calls have not yet been exercised against live Microsoft 365 / Google accounts.
 
 ## Capabilities (v1)
 
@@ -30,10 +30,14 @@ refreshing silently. Auth is **agent-driven** — the agent calls `mailcal_autho
 server opens a browser on this machine (or returns a device code to relay). A one-time
 `--auth` CLI mode is provided for the pure Windows-Service case.
 
-Tokens are stored in a **portable folder** (`MailCal:TokenStoreDirectory`, default `tokens/`),
-one file per account. By default they use a basic reversible encoding (portable, no key to
-carry — convenience, not a security boundary); set `MailCal:TokenEncryptionKey` to AES-encrypt
-them at rest (stays portable as long as the same key is present on the target).
+Tokens are stored in a **portable folder next to the executable** (`MailCal:TokenStoreDirectory`,
+default `tokens/`, resolved relative to the executable directory — the same location for a
+console run or a Windows Service, never the service's System32 working directory; an absolute
+path such as a Docker volume mount is honoured as-is). This holds both the Outlook (MSAL) cache
+and the Gmail (Google) tokens, one set of files per account. By default they use a basic
+reversible encoding (portable, no key to carry — convenience, not a security boundary); set
+`MailCal:TokenEncryptionKey` to AES-encrypt them at rest (stays portable as long as the same key
+is present on the target). The resolved token path is printed in the startup log.
 
 ```sh
 # One-time bootstrap for the pure-service case (browser or device-code)

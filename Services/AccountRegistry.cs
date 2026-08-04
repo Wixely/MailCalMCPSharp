@@ -19,6 +19,7 @@ public sealed class AccountRegistry
 {
     private readonly MailCalOptions _options;
     private readonly ITokenStore _tokenStore;
+    private readonly string _tokenDirectory;
     private readonly Dictionary<string, IMailCalAccount> _accounts = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, IAuthenticator> _authenticators = new(StringComparer.OrdinalIgnoreCase);
     private readonly string? _defaultAlias;
@@ -27,16 +28,12 @@ public sealed class AccountRegistry
     {
         _options = options.Value;
 
-        var dir = _options.TokenStoreDirectory;
-        if (string.IsNullOrWhiteSpace(dir))
-        {
-            dir = "tokens";
-        }
-        if (!Path.IsPathRooted(dir))
-        {
-            dir = Path.Combine(env.ContentRootPath, dir);
-        }
-        _tokenStore = new FileTokenStore(dir, ResolveSecret(_options.TokenEncryptionKey));
+        // Resolve the token store to a folder adjacent to the executable (content root), even for
+        // a Windows Service. Absolute paths are honoured as-is (e.g. a Docker volume mount).
+        var dir = string.IsNullOrWhiteSpace(_options.TokenStoreDirectory) ? "tokens" : _options.TokenStoreDirectory;
+        _tokenDirectory = Path.IsPathRooted(dir) ? dir : Path.Combine(env.ContentRootPath, dir);
+        var encryptionKey = ResolveSecret(_options.TokenEncryptionKey);
+        _tokenStore = new FileTokenStore(_tokenDirectory, encryptionKey);
 
         var counters = new Dictionary<MailCalProvider, int>();
         foreach (var entry in _options.Accounts)
@@ -56,18 +53,23 @@ public sealed class AccountRegistry
             }
             entry.Alias = alias; // reflect resolved alias back so listings read cleanly
 
-            IAuthenticator authenticator = entry.Provider switch
+            IAuthenticator authenticator;
+            IMailCalAccount account;
+            switch (entry.Provider)
             {
-                MailCalProvider.Outlook => new OutlookAuthenticator(entry, _tokenStore, _options),
-                MailCalProvider.Gmail => new GmailAuthenticator(entry, _tokenStore, _options),
-                _ => throw new ArgumentOutOfRangeException(nameof(entry.Provider), entry.Provider, "Unknown provider."),
-            };
-            IMailCalAccount account = entry.Provider switch
-            {
-                MailCalProvider.Outlook => new OutlookAccount(entry, authenticator, _options),
-                MailCalProvider.Gmail => new GmailAccount(entry, authenticator, _options),
-                _ => throw new ArgumentOutOfRangeException(nameof(entry.Provider), entry.Provider, "Unknown provider."),
-            };
+                case MailCalProvider.Outlook:
+                    var outlookAuth = new OutlookAuthenticator(entry, _tokenStore, _options);
+                    authenticator = outlookAuth;
+                    account = new OutlookAccount(entry, outlookAuth, _options);
+                    break;
+                case MailCalProvider.Gmail:
+                    var gmailAuth = new GmailAuthenticator(entry, _tokenDirectory, encryptionKey, _options);
+                    authenticator = gmailAuth;
+                    account = new GmailAccount(entry, gmailAuth, _options);
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(entry.Provider), entry.Provider, "Unknown provider.");
+            }
 
             _accounts[alias] = account;
             _authenticators[alias] = authenticator;
@@ -84,6 +86,9 @@ public sealed class AccountRegistry
     public bool AllowPermanentDelete => _options.AllowPermanentDelete;
     public IReadOnlyCollection<string> Aliases => _accounts.Keys;
     public string? DefaultAlias => _defaultAlias;
+
+    /// <summary>Absolute path to the exe-adjacent token store folder (logged at startup).</summary>
+    public string TokenDirectory => _tokenDirectory;
 
     /// <summary>Resolve an account by alias, or the default when alias is blank.</summary>
     public IMailCalAccount Resolve(string? alias)

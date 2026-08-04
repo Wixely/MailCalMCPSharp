@@ -51,8 +51,9 @@ public sealed class AccountTools
     {
         svc.EnsureWriteAllowed("mailcal_authorize");
         var authenticator = svc.Authenticator(account);
+        // MCP path: device-code returns the URL+code immediately and completes in the background.
         var result = string.Equals(mode, "devicecode", StringComparison.OrdinalIgnoreCase)
-            ? await authenticator.AuthorizeDeviceCodeAsync(ct)
+            ? await authenticator.AuthorizeDeviceCodeAsync(waitForCompletion: false, ct)
             : await authenticator.AuthorizeInteractiveAsync(ct);
         return JsonSerializer.Serialize(result, JsonOpts.Default);
     }
