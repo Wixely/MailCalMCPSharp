@@ -31,11 +31,15 @@ adds no new tools; each account advertises its capabilities, and tools return a 
 
 ## Providers & authentication
 
-| Provider | Domains | Auth |
-| --- | --- | --- |
-| `Outlook` | email, calendar, contacts, rules, scheduled send | Delegated OAuth (agent-driven) |
-| `Gmail` | email, calendar, contacts, rules | Delegated OAuth (agent-driven) |
-| `Imap` | **email only** | Username / password (no OAuth) |
+| Provider | Domains | Auth | Setup guide |
+| --- | --- | --- | --- |
+| `Outlook` | email, calendar, contacts, rules, scheduled send | Delegated OAuth (agent-driven) | [docs/setup-outlook.md](docs/setup-outlook.md) |
+| `Gmail` | email, calendar, contacts, rules | Delegated OAuth (agent-driven) | [docs/setup-gmail.md](docs/setup-gmail.md) |
+| `Imap` | **email only** | Username / password (no OAuth) | [docs/setup-imap.md](docs/setup-imap.md) |
+
+> **First time?** Follow the per-provider setup guide above — it walks through the one-time app
+> registration (Outlook/Gmail) or connection settings (IMAP) needed before an account will
+> authorize.
 
 **OAuth providers (Outlook/Gmail):** each account is authorized once; the server then runs
 unattended, refreshing silently. Auth is **agent-driven** — the agent calls `mailcal_authorize`
