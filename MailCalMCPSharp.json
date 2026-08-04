@@ -13,9 +13,9 @@
 
     "EnableMail": true,
     "EnableCalendar": true,
-    "EnableContacts": false,
-    "EnableRules": false,
-    "EnableScheduledSend": false,
+    "EnableContacts": true,
+    "EnableRules": true,
+    "EnableScheduledSend": true,
 
     "Accounts": [
       {

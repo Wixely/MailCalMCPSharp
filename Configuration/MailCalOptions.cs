@@ -60,14 +60,14 @@ public sealed class MailCalOptions
     /// <summary>Expose calendar tools.</summary>
     public bool EnableCalendar { get; set; } = true;
 
-    /// <summary>Expose contact tools. (v2 — deferred.)</summary>
-    public bool EnableContacts { get; set; } = false;
+    /// <summary>Expose contact tools.</summary>
+    public bool EnableContacts { get; set; } = true;
 
-    /// <summary>Expose email rule / filter tools. (v2 — deferred.)</summary>
-    public bool EnableRules { get; set; } = false;
+    /// <summary>Expose email rule / filter tools.</summary>
+    public bool EnableRules { get; set; } = true;
 
-    /// <summary>Expose scheduled-send tools where the provider supports it. (v2 — deferred.)</summary>
-    public bool EnableScheduledSend { get; set; } = false;
+    /// <summary>Expose scheduled-send tools where the provider supports it (Outlook yes, Gmail no).</summary>
+    public bool EnableScheduledSend { get; set; } = true;
 
     /// <summary>Configured mail/calendar accounts.</summary>
     public List<AccountEntry> Accounts { get; set; } = new();

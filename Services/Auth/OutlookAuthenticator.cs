@@ -30,6 +30,8 @@ public sealed class OutlookAuthenticator : AuthenticatorBase
         "https://graph.microsoft.com/Mail.ReadWrite",
         "https://graph.microsoft.com/Mail.Send",
         "https://graph.microsoft.com/Calendars.ReadWrite",
+        "https://graph.microsoft.com/Contacts.ReadWrite",       // v2 contacts
+        "https://graph.microsoft.com/MailboxSettings.ReadWrite", // v2 inbox rules
     };
 
     protected override bool HasStoredToken() => _store.Exists(Entry.Alias);

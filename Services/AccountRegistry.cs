@@ -182,6 +182,30 @@ public sealed class AccountRegistry
         }
     }
 
+    public void EnsureContactsEnabled()
+    {
+        if (!_options.EnableContacts)
+        {
+            throw new InvalidOperationException("Contact tools are disabled (MailCal:EnableContacts=false).");
+        }
+    }
+
+    public void EnsureRulesEnabled()
+    {
+        if (!_options.EnableRules)
+        {
+            throw new InvalidOperationException("Rule tools are disabled (MailCal:EnableRules=false).");
+        }
+    }
+
+    public void EnsureScheduledSendEnabled()
+    {
+        if (!_options.EnableScheduledSend)
+        {
+            throw new InvalidOperationException("Scheduled-send tool is disabled (MailCal:EnableScheduledSend=false).");
+        }
+    }
+
     /// <summary>Reports "not supported by &lt;provider&gt;" when an account lacks a capability.</summary>
     public static void EnsureCapability(IMailCalAccount account, bool capable, string feature)
     {

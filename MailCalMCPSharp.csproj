@@ -27,6 +27,7 @@
     <!-- Gmail/Google provider -->
     <PackageReference Include="Google.Apis.Gmail.v1" />
     <PackageReference Include="Google.Apis.Calendar.v3" />
+    <PackageReference Include="Google.Apis.PeopleService.v1" />
     <PackageReference Include="Google.Apis.Auth" />
     <PackageReference Include="MimeKit" />
 

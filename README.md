@@ -8,18 +8,23 @@ One provider-agnostic tool surface is routed to a configured account by its alia
 same `mail_*` / `cal_*` tools work against Outlook or Gmail. Adding a provider in future adds
 no new tools.
 
-> **Status: v1 implemented.** Mail and calendar are implemented end-to-end for both Outlook
-> (Microsoft Graph) and Gmail (Google APIs), together with the agent-driven OAuth lifecycle
-> (interactive browser, device-code, and silent refresh). Contacts, email rules, and
-> scheduled-send are planned for v2. This has been built and compiles clean; the provider
+> **Status: full featureset implemented.** Email, calendar, contacts, inbox rules, and
+> scheduled send are implemented end-to-end for both Outlook (Microsoft Graph) and Gmail
+> (Google APIs), together with the agent-driven OAuth lifecycle (interactive browser,
+> device-code, and silent refresh). This has been built and compiles clean; the provider
 > calls have not yet been exercised against live Microsoft 365 / Google accounts.
 
-## Capabilities (v1)
+## Capabilities
 
 - **Email:** list folders/labels, read, list, search, compose draft, send, delete
   (soft/trash by default), move.
 - **Calendar:** list calendars, read a time window, get event, search, create, update,
   delete, respond to invites.
+- **Contacts:** list, get, add, edit, delete (Outlook contacts / Google People).
+- **Inbox rules:** list, create, delete (Outlook message rules / Gmail filters) — a common
+  subset of conditions (from/subject) and actions (move, mark read, delete).
+- **Scheduled send:** future-dated delivery where the provider supports it natively — Outlook
+  yes (Exchange deferred delivery); Gmail returns a clear "not supported".
 - **Accounts & auth:** list accounts, inspect auth state, authorize (browser or device-code),
   and sign out — all as tools the agent can call.
 
@@ -86,7 +91,7 @@ be overridden by environment variables prefixed `MAILCALMCP_` using `__` for nes
 | `MailCal:TokenStoreDirectory` | Portable token folder. | `tokens` |
 | `MailCal:TokenEncryptionKey` | Blank = basic encoding; set (or `file:`) = AES at rest. | `""` |
 | `MailCal:EnableMail` / `EnableCalendar` | Expose those tool groups. | `true` |
-| `MailCal:EnableContacts` / `EnableRules` / `EnableScheduledSend` | v2 features. | `false` |
+| `MailCal:EnableContacts` / `EnableRules` / `EnableScheduledSend` | Expose contacts / rules / scheduled-send tools. | `true` |
 | `Server:Host` / `Port` / `Path` | HTTP bind + MCP route. | `localhost` / `5708` / `/mcp` |
 | `Server:Password` | Optional MCP endpoint password. | `""` |
 | `Server:WindowsServiceName` | SCM service name. | `MailCalMCPSharp` |
@@ -118,6 +123,9 @@ MAILCALMCP_Server__Password=change-me
 | Accounts / auth | `mailcal_list_accounts`, `mailcal_auth_status`, `mailcal_authorize`, `mailcal_deauthorize` |
 | Email | `mail_list_folders`, `mail_read`, `mail_list`, `mail_search`, `mail_compose_draft`, `mail_send`, `mail_delete`, `mail_move` |
 | Calendar | `cal_list_calendars`, `cal_read`, `cal_get_event`, `cal_search`, `cal_create_event`, `cal_update_event`, `cal_delete_event`, `cal_respond_event` |
+| Contacts | `contact_list`, `contact_get`, `contact_add`, `contact_edit`, `contact_delete` |
+| Rules | `mail_list_rules`, `mail_apply_rule`, `mail_delete_rule` |
+| Scheduled send | `mail_schedule_send` (Outlook; Gmail reports not supported) |
 
 ## License
 

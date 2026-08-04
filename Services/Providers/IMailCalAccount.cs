@@ -17,6 +17,7 @@ public interface IMailCalAccount
     IMailProvider Mail { get; }
     ICalendarProvider Calendar { get; }
     IContactsProvider Contacts { get; }
+    IRulesProvider Rules { get; }
 }
 
 /// <summary>Email operations. All calls act on the account's primary mailbox.</summary>
@@ -30,6 +31,9 @@ public interface IMailProvider
     Task<SendResult> SendAsync(OutgoingMessage? message, string? draftId, CancellationToken ct);
     Task DeleteAsync(string messageId, bool permanent, CancellationToken ct);
     Task MoveAsync(string messageId, string destinationFolderId, CancellationToken ct);
+
+    /// <summary>Send a message at a future time, where the provider supports native deferred delivery (Outlook does; Gmail does not).</summary>
+    Task<SendResult> ScheduleSendAsync(OutgoingMessage message, DateTimeOffset sendAt, CancellationToken ct);
 }
 
 /// <summary>Calendar operations.</summary>
@@ -45,7 +49,7 @@ public interface ICalendarProvider
     Task RespondEventAsync(string? calendarId, string eventId, EventResponse response, string? comment, CancellationToken ct);
 }
 
-/// <summary>Contacts operations. (v2 — interface present, tools deferred.)</summary>
+/// <summary>Contacts operations.</summary>
 public interface IContactsProvider
 {
     Task<ContactPage> ListAsync(string? pageToken, int pageSize, CancellationToken ct);
@@ -53,4 +57,12 @@ public interface IContactsProvider
     Task<Contact> AddAsync(ContactInput input, CancellationToken ct);
     Task<Contact> EditAsync(string contactId, ContactInput input, CancellationToken ct);
     Task DeleteAsync(string contactId, CancellationToken ct);
+}
+
+/// <summary>Inbox rules (Outlook message rules) / filters (Gmail).</summary>
+public interface IRulesProvider
+{
+    Task<IReadOnlyList<MailRule>> ListRulesAsync(CancellationToken ct);
+    Task<MailRule> CreateRuleAsync(MailRuleInput input, CancellationToken ct);
+    Task DeleteRuleAsync(string ruleId, CancellationToken ct);
 }

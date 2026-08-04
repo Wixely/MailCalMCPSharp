@@ -14,7 +14,7 @@ using GraphModels = Microsoft.Graph.Models;
 namespace MailCalMCPSharp.Services.Providers.Outlook;
 
 /// <summary>Outlook account backed by Microsoft Graph.</summary>
-public sealed class OutlookAccount : IMailCalAccount, IMailProvider, ICalendarProvider, IContactsProvider
+public sealed class OutlookAccount : IMailCalAccount, IMailProvider, ICalendarProvider, IContactsProvider, IRulesProvider
 {
     private readonly AccountEntry _entry;
     private readonly IAuthenticator _authenticator;
@@ -53,6 +53,7 @@ public sealed class OutlookAccount : IMailCalAccount, IMailProvider, ICalendarPr
     public IMailProvider Mail => this;
     public ICalendarProvider Calendar => this;
     public IContactsProvider Contacts => this;
+    public IRulesProvider Rules => this;
 
     private GraphServiceClient Graph => _graph.Value;
 
@@ -167,6 +168,21 @@ public sealed class OutlookAccount : IMailCalAccount, IMailProvider, ICalendarPr
         await Graph.Me.Messages[messageId].Move.PostAsync(new MovePostRequestBody { DestinationId = destinationFolderId }, cancellationToken: ct).ConfigureAwait(false);
     }
 
+    public async Task<SendResult> ScheduleSendAsync(OutgoingMessage message, DateTimeOffset sendAt, CancellationToken ct)
+    {
+        // Deferred delivery via the PidTagDeferredSendTime MAPI property (0x3FEF, SystemTime):
+        // create the message with the property, then send it — Exchange holds it until sendAt.
+        var msg = BuildMessage(message);
+        msg.SingleValueExtendedProperties = new List<GraphModels.SingleValueLegacyExtendedProperty>
+        {
+            new() { Id = "SystemTime 0x3FEF", Value = sendAt.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture) },
+        };
+        var created = await Graph.Me.Messages.PostAsync(msg, cancellationToken: ct).ConfigureAwait(false)
+            ?? throw new InvalidOperationException("Scheduled message could not be created.");
+        await Graph.Me.Messages[created.Id].Send.PostAsync(cancellationToken: ct).ConfigureAwait(false);
+        return new SendResult(created.Id, true);
+    }
+
     // ---------------- Calendar ----------------
 
     public async Task<IReadOnlyList<CalendarInfo>> ListCalendarsAsync(CancellationToken ct)
@@ -279,15 +295,136 @@ public sealed class OutlookAccount : IMailCalAccount, IMailProvider, ICalendarPr
         }
     }
 
-    // ---------------- Contacts (v2) ----------------
+    // ---------------- Contacts ----------------
 
-    public Task<ContactPage> ListAsync(string? pageToken, int pageSize, CancellationToken ct) => throw NotV1();
-    public Task<Contact> GetAsync(string contactId, CancellationToken ct) => throw NotV1();
-    public Task<Contact> AddAsync(ContactInput input, CancellationToken ct) => throw NotV1();
-    public Task<Contact> EditAsync(string contactId, ContactInput input, CancellationToken ct) => throw NotV1();
-    Task IContactsProvider.DeleteAsync(string contactId, CancellationToken ct) => throw NotV1();
+    public async Task<ContactPage> ListAsync(string? pageToken, int pageSize, CancellationToken ct)
+    {
+        var resp = string.IsNullOrWhiteSpace(pageToken)
+            ? await Graph.Me.Contacts.GetAsync(rc => { rc.QueryParameters.Top = pageSize; }, ct).ConfigureAwait(false)
+            : await Graph.Me.Contacts.WithUrl(pageToken).GetAsync(cancellationToken: ct).ConfigureAwait(false);
+        return new ContactPage
+        {
+            Contacts = resp?.Value?.Select(MapContact).ToList() ?? new List<Contact>(),
+            NextPageToken = resp?.OdataNextLink,
+        };
+    }
 
-    private static NotSupportedException NotV1() => new("Contacts are a v2 feature and are not enabled.");
+    public async Task<Contact> GetAsync(string contactId, CancellationToken ct)
+    {
+        var c = await Graph.Me.Contacts[contactId].GetAsync(cancellationToken: ct).ConfigureAwait(false)
+            ?? throw new InvalidOperationException($"Contact '{contactId}' not found.");
+        return MapContact(c);
+    }
+
+    public async Task<Contact> AddAsync(ContactInput input, CancellationToken ct)
+    {
+        var created = await Graph.Me.Contacts.PostAsync(BuildContact(new GraphModels.Contact(), input), cancellationToken: ct).ConfigureAwait(false)
+            ?? throw new InvalidOperationException("Contact creation returned nothing.");
+        return MapContact(created);
+    }
+
+    public async Task<Contact> EditAsync(string contactId, ContactInput input, CancellationToken ct)
+    {
+        var updated = await Graph.Me.Contacts[contactId].PatchAsync(BuildContact(new GraphModels.Contact(), input), cancellationToken: ct).ConfigureAwait(false);
+        return updated is null ? await GetAsync(contactId, ct).ConfigureAwait(false) : MapContact(updated);
+    }
+
+    async Task IContactsProvider.DeleteAsync(string contactId, CancellationToken ct)
+    {
+        await Graph.Me.Contacts[contactId].DeleteAsync(cancellationToken: ct).ConfigureAwait(false);
+    }
+
+    // ---------------- Rules (message rules) ----------------
+
+    public async Task<IReadOnlyList<MailRule>> ListRulesAsync(CancellationToken ct)
+    {
+        var resp = await Graph.Me.MailFolders["inbox"].MessageRules.GetAsync(cancellationToken: ct).ConfigureAwait(false);
+        return resp?.Value?.Select(MapRule).ToList() ?? new List<MailRule>();
+    }
+
+    public async Task<MailRule> CreateRuleAsync(MailRuleInput input, CancellationToken ct)
+    {
+        var rule = new GraphModels.MessageRule
+        {
+            DisplayName = string.IsNullOrWhiteSpace(input.Name) ? "MailCal rule" : input.Name,
+            IsEnabled = true,
+            Sequence = 1,
+            Conditions = new GraphModels.MessageRulePredicates
+            {
+                SenderContains = string.IsNullOrWhiteSpace(input.FromContains) ? null : new List<string> { input.FromContains },
+                SubjectContains = string.IsNullOrWhiteSpace(input.SubjectContains) ? null : new List<string> { input.SubjectContains },
+            },
+            Actions = new GraphModels.MessageRuleActions
+            {
+                MoveToFolder = string.IsNullOrWhiteSpace(input.MoveToFolderId) ? null : input.MoveToFolderId,
+                MarkAsRead = input.MarkAsRead ? true : null,
+                Delete = input.Delete ? true : null,
+            },
+        };
+        var created = await Graph.Me.MailFolders["inbox"].MessageRules.PostAsync(rule, cancellationToken: ct).ConfigureAwait(false)
+            ?? throw new InvalidOperationException("Rule creation returned nothing.");
+        return MapRule(created);
+    }
+
+    public async Task DeleteRuleAsync(string ruleId, CancellationToken ct)
+    {
+        await Graph.Me.MailFolders["inbox"].MessageRules[ruleId].DeleteAsync(cancellationToken: ct).ConfigureAwait(false);
+    }
+
+    private static Contact MapContact(GraphModels.Contact c)
+    {
+        var phones = new List<string>();
+        if (c.BusinessPhones is not null) phones.AddRange(c.BusinessPhones);
+        if (c.HomePhones is not null) phones.AddRange(c.HomePhones);
+        if (!string.IsNullOrWhiteSpace(c.MobilePhone)) phones.Add(c.MobilePhone);
+
+        return new Contact
+        {
+            Id = c.Id ?? string.Empty,
+            DisplayName = c.DisplayName,
+            GivenName = c.GivenName,
+            Surname = c.Surname,
+            Emails = c.EmailAddresses?.Where(e => !string.IsNullOrWhiteSpace(e.Address)).Select(e => e.Address!).ToList()
+                ?? (IReadOnlyList<string>)Array.Empty<string>(),
+            Phones = phones,
+            Company = c.CompanyName,
+            JobTitle = c.JobTitle,
+        };
+    }
+
+    private static GraphModels.Contact BuildContact(GraphModels.Contact c, ContactInput input)
+    {
+        if (input.GivenName is not null) c.GivenName = input.GivenName;
+        if (input.Surname is not null) c.Surname = input.Surname;
+        if (input.Emails.Count > 0)
+        {
+            c.EmailAddresses = input.Emails.Select(a => new GraphModels.EmailAddress { Address = a, Name = a }).ToList();
+        }
+        if (input.Phones.Count > 0) c.BusinessPhones = input.Phones.ToList();
+        if (input.Company is not null) c.CompanyName = input.Company;
+        if (input.JobTitle is not null) c.JobTitle = input.JobTitle;
+        return c;
+    }
+
+    private static MailRule MapRule(GraphModels.MessageRule r)
+    {
+        var conditions = new List<string>();
+        if (r.Conditions?.SenderContains is { Count: > 0 } sc) conditions.Add($"from~{string.Join('/', sc)}");
+        if (r.Conditions?.SubjectContains is { Count: > 0 } su) conditions.Add($"subject~{string.Join('/', su)}");
+
+        var actions = new List<string>();
+        if (!string.IsNullOrWhiteSpace(r.Actions?.MoveToFolder)) actions.Add($"move→{r.Actions.MoveToFolder}");
+        if (r.Actions?.MarkAsRead == true) actions.Add("markRead");
+        if (r.Actions?.Delete == true) actions.Add("delete");
+
+        return new MailRule
+        {
+            Id = r.Id ?? string.Empty,
+            Name = r.DisplayName,
+            IsEnabled = r.IsEnabled ?? true,
+            Description = $"if [{string.Join(", ", conditions)}] then [{string.Join(", ", actions)}]",
+        };
+    }
 
     // ---------------- Mapping ----------------
 

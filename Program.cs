@@ -85,6 +85,9 @@ public static class Program
             mcp.WithTools<AccountTools>();
             if (mailCal.EnableMail) mcp.WithTools<MailTools>();
             if (mailCal.EnableCalendar) mcp.WithTools<CalendarTools>();
+            if (mailCal.EnableContacts) mcp.WithTools<ContactTools>();
+            if (mailCal.EnableRules) mcp.WithTools<MailRulesTools>();
+            if (mailCal.EnableMail && mailCal.EnableScheduledSend) mcp.WithTools<ScheduledSendTools>();
 
             var server = builder.Configuration.GetSection(ServerOptions.SectionName).Get<ServerOptions>() ?? new ServerOptions();
             builder.WebHost.ConfigureKestrel(k =>
@@ -127,7 +130,7 @@ public static class Program
                 {
                     $"Read-only: {registry.IsReadOnly}",
                     $"Allow permanent delete: {registry.AllowPermanentDelete}",
-                    $"Mail: {(mailCal.EnableMail ? "enabled" : "disabled")}, Calendar: {(mailCal.EnableCalendar ? "enabled" : "disabled")}",
+                    $"Features: Mail={mailCal.EnableMail}, Calendar={mailCal.EnableCalendar}, Contacts={mailCal.EnableContacts}, Rules={mailCal.EnableRules}, ScheduledSend={mailCal.EnableScheduledSend}",
                     $"Token store: {registry.TokenDirectory}",
                     $"Accounts ({registry.Aliases.Count}): {(accountDetails.Length == 0 ? "none configured" : string.Join(", ", accountDetails))}",
                 });

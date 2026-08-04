@@ -19,6 +19,7 @@
     <!-- Gmail/Google provider: Google API client libraries (Apache-2.0). Matched 1.74.0 set. -->
     <PackageVersion Include="Google.Apis.Gmail.v1" Version="1.74.0.4162" />
     <PackageVersion Include="Google.Apis.Calendar.v3" Version="1.74.0.4154" />
+    <PackageVersion Include="Google.Apis.PeopleService.v1" Version="1.74.0.3973" />
     <PackageVersion Include="Google.Apis.Auth" Version="1.74.0" />
 
     <!-- RFC822 build/parse for Gmail send/draft (MIT) -->

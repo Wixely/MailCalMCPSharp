@@ -1,6 +1,7 @@
 using System.Text;
 using Google.Apis.Calendar.v3;
 using Google.Apis.Gmail.v1;
+using Google.Apis.PeopleService.v1;
 using Google.Apis.Services;
 using Google.Apis.Util;
 using MailCalMCPSharp.Configuration;
@@ -9,11 +10,12 @@ using MailCalMCPSharp.Services.Models;
 using MimeKit;
 using CalData = Google.Apis.Calendar.v3.Data;
 using GmailData = Google.Apis.Gmail.v1.Data;
+using PeopleData = Google.Apis.PeopleService.v1.Data;
 
 namespace MailCalMCPSharp.Services.Providers.Gmail;
 
 /// <summary>Gmail account backed by the Google Gmail + Calendar API client libraries.</summary>
-public sealed class GmailAccount : IMailCalAccount, IMailProvider, ICalendarProvider, IContactsProvider
+public sealed class GmailAccount : IMailCalAccount, IMailProvider, ICalendarProvider, IContactsProvider, IRulesProvider
 {
     private const string Me = "me";
     private static readonly string[] SummaryHeaders = { "Subject", "From", "To", "Cc", "Date" };
@@ -25,6 +27,7 @@ public sealed class GmailAccount : IMailCalAccount, IMailProvider, ICalendarProv
 
     private GmailService? _gmail;
     private CalendarService? _calendar;
+    private PeopleServiceService? _people;
 
     public GmailAccount(AccountEntry entry, GmailAuthenticator authenticator, MailCalOptions options)
     {
@@ -49,6 +52,7 @@ public sealed class GmailAccount : IMailCalAccount, IMailProvider, ICalendarProv
     public IMailProvider Mail => this;
     public ICalendarProvider Calendar => this;
     public IContactsProvider Contacts => this;
+    public IRulesProvider Rules => this;
 
     private async Task<GmailService> GmailAsync(CancellationToken ct)
     {
@@ -95,6 +99,32 @@ public sealed class GmailAccount : IMailCalAccount, IMailProvider, ICalendarProv
                 });
             }
             return _calendar;
+        }
+        finally
+        {
+            _initLock.Release();
+        }
+    }
+
+    private async Task<PeopleServiceService> PeopleAsync(CancellationToken ct)
+    {
+        if (_people is not null)
+        {
+            return _people;
+        }
+        await _initLock.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            if (_people is null)
+            {
+                var cred = await _authenticator.GetCredentialAsync(ct).ConfigureAwait(false);
+                _people = new PeopleServiceService(new BaseClientService.Initializer
+                {
+                    HttpClientInitializer = cred,
+                    ApplicationName = "MailCalMCPSharp",
+                });
+            }
+            return _people;
         }
         finally
         {
@@ -192,6 +222,9 @@ public sealed class GmailAccount : IMailCalAccount, IMailProvider, ICalendarProv
         };
         await svc.Users.Messages.Modify(mod, Me, messageId).ExecuteAsync(ct).ConfigureAwait(false);
     }
+
+    public Task<SendResult> ScheduleSendAsync(OutgoingMessage message, DateTimeOffset sendAt, CancellationToken ct) =>
+        throw new NotSupportedException("Gmail does not expose scheduled send (send-later) through its API.");
 
     // ---------------- Calendar ----------------
 
@@ -298,15 +331,170 @@ public sealed class GmailAccount : IMailCalAccount, IMailProvider, ICalendarProv
         await svc.Events.Patch(new CalData.Event { Attendees = e.Attendees }, cal, eventId).ExecuteAsync(ct).ConfigureAwait(false);
     }
 
-    // ---------------- Contacts (v2) ----------------
+    // ---------------- Contacts (Google People API) ----------------
 
-    public Task<ContactPage> ListAsync(string? pageToken, int pageSize, CancellationToken ct) => throw NotV1();
-    public Task<Contact> GetAsync(string contactId, CancellationToken ct) => throw NotV1();
-    public Task<Contact> AddAsync(ContactInput input, CancellationToken ct) => throw NotV1();
-    public Task<Contact> EditAsync(string contactId, ContactInput input, CancellationToken ct) => throw NotV1();
-    Task IContactsProvider.DeleteAsync(string contactId, CancellationToken ct) => throw NotV1();
+    private const string PersonFields = "names,emailAddresses,phoneNumbers,organizations";
 
-    private static NotSupportedException NotV1() => new("Contacts are a v2 feature and are not enabled.");
+    public async Task<ContactPage> ListAsync(string? pageToken, int pageSize, CancellationToken ct)
+    {
+        var svc = await PeopleAsync(ct).ConfigureAwait(false);
+        var req = svc.People.Connections.List("people/me");
+        req.PersonFields = PersonFields;
+        req.PageSize = pageSize;
+        req.PageToken = pageToken;
+        var resp = await req.ExecuteAsync(ct).ConfigureAwait(false);
+        return new ContactPage
+        {
+            Contacts = resp.Connections?.Select(MapPerson).ToList() ?? new List<Contact>(),
+            NextPageToken = resp.NextPageToken,
+        };
+    }
+
+    public async Task<Contact> GetAsync(string contactId, CancellationToken ct)
+    {
+        var svc = await PeopleAsync(ct).ConfigureAwait(false);
+        var req = svc.People.Get(contactId);
+        req.PersonFields = PersonFields;
+        var person = await req.ExecuteAsync(ct).ConfigureAwait(false);
+        return MapPerson(person);
+    }
+
+    public async Task<Contact> AddAsync(ContactInput input, CancellationToken ct)
+    {
+        var svc = await PeopleAsync(ct).ConfigureAwait(false);
+        var created = await svc.People.CreateContact(BuildPerson(new PeopleData.Person(), input)).ExecuteAsync(ct).ConfigureAwait(false);
+        return MapPerson(created);
+    }
+
+    public async Task<Contact> EditAsync(string contactId, ContactInput input, CancellationToken ct)
+    {
+        var svc = await PeopleAsync(ct).ConfigureAwait(false);
+        // Update requires the current etag, so fetch first, then apply changes.
+        var getReq = svc.People.Get(contactId);
+        getReq.PersonFields = PersonFields;
+        var existing = await getReq.ExecuteAsync(ct).ConfigureAwait(false);
+
+        var updateReq = svc.People.UpdateContact(BuildPerson(existing, input), contactId);
+        updateReq.UpdatePersonFields = PersonFields;
+        var updated = await updateReq.ExecuteAsync(ct).ConfigureAwait(false);
+        return MapPerson(updated);
+    }
+
+    async Task IContactsProvider.DeleteAsync(string contactId, CancellationToken ct)
+    {
+        var svc = await PeopleAsync(ct).ConfigureAwait(false);
+        await svc.People.DeleteContact(contactId).ExecuteAsync(ct).ConfigureAwait(false);
+    }
+
+    // ---------------- Rules (Gmail filters) ----------------
+
+    public async Task<IReadOnlyList<MailRule>> ListRulesAsync(CancellationToken ct)
+    {
+        var svc = await GmailAsync(ct).ConfigureAwait(false);
+        var resp = await svc.Users.Settings.Filters.List(Me).ExecuteAsync(ct).ConfigureAwait(false);
+        return resp.Filter?.Select(MapFilter).ToList() ?? new List<MailRule>();
+    }
+
+    public async Task<MailRule> CreateRuleAsync(MailRuleInput input, CancellationToken ct)
+    {
+        var svc = await GmailAsync(ct).ConfigureAwait(false);
+        var add = new List<string>();
+        var remove = new List<string>();
+        if (!string.IsNullOrWhiteSpace(input.MoveToFolderId))
+        {
+            add.Add(input.MoveToFolderId);
+            remove.Add("INBOX");
+        }
+        if (input.MarkAsRead) remove.Add("UNREAD");
+        if (input.Delete) add.Add("TRASH");
+
+        var filter = new GmailData.Filter
+        {
+            Criteria = new GmailData.FilterCriteria
+            {
+                From = string.IsNullOrWhiteSpace(input.FromContains) ? null : input.FromContains,
+                Subject = string.IsNullOrWhiteSpace(input.SubjectContains) ? null : input.SubjectContains,
+            },
+            Action = new GmailData.FilterAction
+            {
+                AddLabelIds = add.Count > 0 ? add : null,
+                RemoveLabelIds = remove.Count > 0 ? remove : null,
+            },
+        };
+        var created = await svc.Users.Settings.Filters.Create(filter, Me).ExecuteAsync(ct).ConfigureAwait(false);
+        return MapFilter(created);
+    }
+
+    public async Task DeleteRuleAsync(string ruleId, CancellationToken ct)
+    {
+        var svc = await GmailAsync(ct).ConfigureAwait(false);
+        await svc.Users.Settings.Filters.Delete(Me, ruleId).ExecuteAsync(ct).ConfigureAwait(false);
+    }
+
+    private static Contact MapPerson(PeopleData.Person p)
+    {
+        var name = p.Names?.FirstOrDefault();
+        var org = p.Organizations?.FirstOrDefault();
+        return new Contact
+        {
+            Id = p.ResourceName ?? string.Empty,
+            DisplayName = name?.DisplayName,
+            GivenName = name?.GivenName,
+            Surname = name?.FamilyName,
+            Emails = p.EmailAddresses?.Where(e => !string.IsNullOrWhiteSpace(e.Value)).Select(e => e.Value!).ToList()
+                ?? (IReadOnlyList<string>)Array.Empty<string>(),
+            Phones = p.PhoneNumbers?.Where(n => !string.IsNullOrWhiteSpace(n.Value)).Select(n => n.Value!).ToList()
+                ?? (IReadOnlyList<string>)Array.Empty<string>(),
+            Company = org?.Name,
+            JobTitle = org?.Title,
+        };
+    }
+
+    private static PeopleData.Person BuildPerson(PeopleData.Person p, ContactInput input)
+    {
+        if (input.GivenName is not null || input.Surname is not null)
+        {
+            var name = p.Names?.FirstOrDefault() ?? new PeopleData.Name();
+            if (input.GivenName is not null) name.GivenName = input.GivenName;
+            if (input.Surname is not null) name.FamilyName = input.Surname;
+            p.Names = new List<PeopleData.Name> { name };
+        }
+        if (input.Emails.Count > 0)
+        {
+            p.EmailAddresses = input.Emails.Select(a => new PeopleData.EmailAddress { Value = a }).ToList();
+        }
+        if (input.Phones.Count > 0)
+        {
+            p.PhoneNumbers = input.Phones.Select(a => new PeopleData.PhoneNumber { Value = a }).ToList();
+        }
+        if (input.Company is not null || input.JobTitle is not null)
+        {
+            var org = p.Organizations?.FirstOrDefault() ?? new PeopleData.Organization();
+            if (input.Company is not null) org.Name = input.Company;
+            if (input.JobTitle is not null) org.Title = input.JobTitle;
+            p.Organizations = new List<PeopleData.Organization> { org };
+        }
+        return p;
+    }
+
+    private static MailRule MapFilter(GmailData.Filter f)
+    {
+        var conditions = new List<string>();
+        if (!string.IsNullOrWhiteSpace(f.Criteria?.From)) conditions.Add($"from~{f.Criteria.From}");
+        if (!string.IsNullOrWhiteSpace(f.Criteria?.Subject)) conditions.Add($"subject~{f.Criteria.Subject}");
+
+        var actions = new List<string>();
+        if (f.Action?.AddLabelIds is { Count: > 0 } add) actions.Add($"addLabels[{string.Join('/', add)}]");
+        if (f.Action?.RemoveLabelIds is { Count: > 0 } rem) actions.Add($"removeLabels[{string.Join('/', rem)}]");
+
+        return new MailRule
+        {
+            Id = f.Id,
+            Name = null,
+            IsEnabled = true,
+            Description = $"if [{string.Join(", ", conditions)}] then [{string.Join(", ", actions)}]",
+        };
+    }
 
     // ---------------- Helpers ----------------
 

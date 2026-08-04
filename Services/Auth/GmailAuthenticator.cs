@@ -43,7 +43,9 @@ public sealed class GmailAuthenticator : AuthenticatorBase
     {
         "https://www.googleapis.com/auth/gmail.modify",
         "https://www.googleapis.com/auth/gmail.send",
+        "https://www.googleapis.com/auth/gmail.settings.basic", // v2 filters (rules)
         "https://www.googleapis.com/auth/calendar",
+        "https://www.googleapis.com/auth/contacts",             // v2 contacts (People API)
     };
 
     protected override string? MissingConfigReason()
