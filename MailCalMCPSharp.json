@@ -56,7 +56,7 @@
   },
   "Server": {
     "Host": "localhost",
-    "Port": 5708,
+    "Port": 5717,
     "Path": "/mcp",
     "WindowsServiceName": "MailCalMCPSharp",
     "Password": ""
