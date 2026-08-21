@@ -72,13 +72,13 @@ MailCalMCPSharp --auth personal --auth-mode devicecode
 
 ```sh
 MailCalMCPSharp
-# HTTP MCP endpoint on http://localhost:5708/mcp
+# HTTP MCP endpoint on http://localhost:5717/mcp
 ```
 
 ### Docker
 
 ```sh
-docker run --rm -p 5708:5708 \
+docker run --rm -p 5717:5717 \
   -e MAILCALMCP_Server__Password=change-me \
   -e MAILCALMCP_MailCal__ReadOnly=true \
   -v mailcal-tokens:/data/tokens \
@@ -108,7 +108,7 @@ be overridden by environment variables prefixed `MAILCALMCP_` using `__` for nes
 | `MailCal:TokenEncryptionKey` | Blank = basic encoding; set (or `file:`) = AES at rest. | `""` |
 | `MailCal:EnableMail` / `EnableCalendar` | Expose those tool groups. | `true` |
 | `MailCal:EnableContacts` / `EnableRules` / `EnableScheduledSend` | Expose contacts / rules / scheduled-send tools. | `true` |
-| `Server:Host` / `Port` / `Path` | HTTP bind + MCP route. | `localhost` / `5708` / `/mcp` |
+| `Server:Host` / `Port` / `Path` | HTTP bind + MCP route. | `localhost` / `5717` / `/mcp` |
 | `Server:Password` | Optional MCP endpoint password. | `""` |
 | `Server:WindowsServiceName` | SCM service name. | `MailCalMCPSharp` |
 

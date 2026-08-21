@@ -41,7 +41,7 @@ ENV DOTNET_ENVIRONMENT=Production \
     ASPNETCORE_ENVIRONMENT=Production \
     DOTNET_RUNNING_IN_CONTAINER=true \
     MAILCALMCP_Server__Host=0.0.0.0 \
-    MAILCALMCP_Server__Port=5708 \
+    MAILCALMCP_Server__Port=5717 \
     MAILCALMCP_Server__Path=/mcp \
     MAILCALMCP_Server__Password= \
     MAILCALMCP_MailCal__ReadOnly=true \
@@ -51,7 +51,7 @@ RUN mkdir -p /app/logs /data/tokens && chown -R $APP_UID:0 /app /data
 COPY --from=build --chown=$APP_UID:0 /app/publish ./
 
 USER $APP_UID
-EXPOSE 5708
+EXPOSE 5717
 VOLUME ["/app/logs", "/data/tokens"]
 
 ENTRYPOINT ["./MailCalMCPSharp"]
